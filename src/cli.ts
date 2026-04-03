@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { watch } from 'node:fs';
 import { analyzeFile, analyzeDirectory } from './analyzers/index.js';
 import { formatFileText, formatDirectoryText } from './formatters/text.js';
 import { loadConfig, mergeConfig } from './utils/config.js';
-import type { CheckName } from './types.js';
+import type { CheckName, AnalyzerOptions } from './types.js';
 
 const VERSION = '0.1.0';
 
@@ -21,6 +22,7 @@ const HELP = `
     --checks <list>            Comma-separated checks (complexity,naming,structure,patterns,imports,documentation,security,duplication)
     --severity <level>         Minimum severity: info, warning, error
     --json                     Output as JSON
+    --watch, -w                Re-analyze on file changes
     --version, -v              Show version
     --help, -h                 Show this help
 
@@ -30,6 +32,40 @@ const HELP = `
     2   Errors found
     3   Runtime error
 `;
+
+async function runAnalysis(
+  resolved: string,
+  isDir: boolean,
+  options: Partial<AnalyzerOptions>,
+  jsonOutput: boolean,
+): Promise<{ errors: number; warnings: number }> {
+  let errorCount = 0;
+  let warningCount = 0;
+
+  if (isDir) {
+    const analysis = await analyzeDirectory(resolved, undefined, 50, options);
+    errorCount = analysis.findingsBySeverity.error;
+    warningCount = analysis.findingsBySeverity.warning;
+
+    if (jsonOutput) {
+      console.log(JSON.stringify(analysis, null, 2));
+    } else {
+      console.log(formatDirectoryText(analysis));
+    }
+  } else {
+    const analysis = await analyzeFile(resolved, options);
+    errorCount = analysis.findings.filter(f => f.severity === 'error').length;
+    warningCount = analysis.findings.filter(f => f.severity === 'warning').length;
+
+    if (jsonOutput) {
+      console.log(JSON.stringify(analysis, null, 2));
+    } else {
+      console.log(formatFileText(analysis));
+    }
+  }
+
+  return { errors: errorCount, warnings: warningCount };
+}
 
 async function main() {
   const args = process.argv.slice(2);
@@ -46,6 +82,7 @@ async function main() {
 
   // Parse flags
   const jsonOutput = args.includes('--json');
+  const watchMode = args.includes('--watch') || args.includes('-w');
   const checksIndex = args.indexOf('--checks');
   const severityIndex = args.indexOf('--severity');
 
@@ -67,7 +104,6 @@ async function main() {
       break;
     }
     if (!arg.startsWith('-') && arg !== args[checksIndex + 1] && arg !== args[severityIndex + 1]) {
-      // Bare path without @
       if (checksIndex >= 0 && args.indexOf(arg) === checksIndex + 1) continue;
       if (severityIndex >= 0 && args.indexOf(arg) === severityIndex + 1) continue;
       target = arg;
@@ -75,7 +111,6 @@ async function main() {
     }
   }
 
-  // Default to current directory
   if (!target) {
     target = '.';
   }
@@ -84,13 +119,14 @@ async function main() {
 
   try {
     const stat = await fs.stat(resolved);
-    const configDir = stat.isDirectory() ? resolved : path.dirname(resolved);
+    const isDir = stat.isDirectory();
+    const configDir = isDir ? resolved : path.dirname(resolved);
     const fileConfig = await loadConfig(configDir);
     const merged = mergeConfig(fileConfig, {
       checks: checks ?? undefined,
       severityThreshold: severity,
     });
-    const options = {
+    const options: Partial<AnalyzerOptions> = {
       checks: merged.checks as CheckName[] ?? ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication'] as CheckName[],
       severityThreshold: merged.severityThreshold ?? severity,
       thresholds: merged.thresholds,
@@ -98,34 +134,28 @@ async function main() {
       ignore: merged.ignore,
     };
 
-    let errorCount = 0;
-    let warningCount = 0;
+    if (watchMode) {
+      console.log(`\x1b[36mWatching ${resolved} for changes...\x1b[0m\n`);
+      await runAnalysis(resolved, isDir, options, jsonOutput);
 
-    if (stat.isDirectory()) {
-      const analysis = await analyzeDirectory(resolved, undefined, 50, options);
-      errorCount = analysis.findingsBySeverity.error;
-      warningCount = analysis.findingsBySeverity.warning;
-
-      if (jsonOutput) {
-        console.log(JSON.stringify(analysis, null, 2));
-      } else {
-        console.log(formatDirectoryText(analysis));
-      }
+      let debounce: ReturnType<typeof setTimeout> | null = null;
+      watch(resolved, { recursive: isDir }, () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(async () => {
+          console.clear();
+          console.log(`\x1b[36mRe-analyzing (${new Date().toLocaleTimeString()})...\x1b[0m\n`);
+          try {
+            await runAnalysis(resolved, isDir, options, jsonOutput);
+          } catch (err) {
+            console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
+          }
+        }, 300);
+      });
     } else {
-      const analysis = await analyzeFile(resolved, options);
-      errorCount = analysis.findings.filter(f => f.severity === 'error').length;
-      warningCount = analysis.findings.filter(f => f.severity === 'warning').length;
-
-      if (jsonOutput) {
-        console.log(JSON.stringify(analysis, null, 2));
-      } else {
-        console.log(formatFileText(analysis));
-      }
+      const { errors, warnings } = await runAnalysis(resolved, isDir, options, jsonOutput);
+      if (errors > 0) process.exit(2);
+      if (warnings > 0) process.exit(1);
     }
-
-    // Exit code: 2 for errors, 1 for warnings-only, 0 for clean
-    if (errorCount > 0) process.exit(2);
-    if (warningCount > 0) process.exit(1);
   } catch (err) {
     console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
     process.exit(3);
