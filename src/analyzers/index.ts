@@ -77,6 +77,9 @@ export async function analyzeFile(
   // Filter by severity threshold
   findings = findings.filter(f => SEVERITY_ORDER[f.severity] >= SEVERITY_ORDER[threshold]);
 
+  // Filter out suppressed findings (readyorai-ignore-next-line / readyorai-ignore)
+  findings = filterSuppressed(findings, file.lines);
+
   // Sort by severity (error first), then by line number
   findings.sort((a, b) => {
     const sevDiff = SEVERITY_ORDER[b.severity] - SEVERITY_ORDER[a.severity];
@@ -153,4 +156,28 @@ export async function analyzeDirectory(
     files: results,
     analyzedAt: new Date().toISOString(),
   };
+}
+
+const SUPPRESS_PATTERN = /readyorai-ignore(?:-next-line)?(?:\s+(\S+))?/;
+
+function filterSuppressed(findings: Finding[], lines: string[]): Finding[] {
+  const suppressedLines = new Map<number, string | null>();
+  for (let i = 0; i < lines.length; i++) {
+    const match = lines[i].match(SUPPRESS_PATTERN);
+    if (!match) continue;
+    const check = match[1] || null;
+    if (/readyorai-ignore-next-line/.test(lines[i])) {
+      suppressedLines.set(i + 2, check); // next line (1-indexed)
+    } else {
+      suppressedLines.set(i + 1, check); // same line (inline)
+    }
+  }
+
+  return findings.filter(f => {
+    if (!f.line) return true;
+    const suppression = suppressedLines.get(f.line);
+    if (suppression === undefined) return true;
+    if (suppression === null) return false;
+    return f.check !== suppression;
+  });
 }
