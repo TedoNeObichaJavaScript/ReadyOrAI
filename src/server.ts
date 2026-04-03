@@ -142,6 +142,77 @@ export function createServer(): McpServer {
     },
   );
 
+  // ── Tool: compare_files ──────────────────────────────────────────────
+  server.registerTool(
+    'compare_files',
+    {
+      title: 'Compare Files',
+      description: 'Compare two file versions (or two files) and show which findings were fixed, introduced, or unchanged.',
+      inputSchema: {
+        before: z.string().describe('Path to the original (before) file'),
+        after: z.string().describe('Path to the updated (after) file'),
+        checks: z.array(z.enum(CHECK_VALUES)).optional().describe('Specific checks to run. Defaults to all.'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ before, after, checks }) => {
+      try {
+        const resolvedChecks = checks?.includes('all') || !checks
+          ? undefined
+          : (checks.filter(c => c !== 'all') as CheckName[]);
+        const opts = resolvedChecks
+          ? { checks: resolvedChecks, severityThreshold: 'info' as const }
+          : undefined;
+
+        const [beforeAnalysis, afterAnalysis] = await Promise.all([
+          analyzeFile(before, opts),
+          analyzeFile(after, opts),
+        ]);
+
+        const beforeMsgs = new Set(beforeAnalysis.findings.map(f => `${f.check}:${f.message}`));
+        const afterMsgs = new Set(afterAnalysis.findings.map(f => `${f.check}:${f.message}`));
+
+        const fixed = beforeAnalysis.findings.filter(f => !afterMsgs.has(`${f.check}:${f.message}`));
+        const introduced = afterAnalysis.findings.filter(f => !beforeMsgs.has(`${f.check}:${f.message}`));
+        const unchanged = afterAnalysis.findings.filter(f => beforeMsgs.has(`${f.check}:${f.message}`));
+
+        const lines: string[] = [];
+        lines.push(`## Comparison: ${before} → ${after}`);
+        lines.push(`Before: ${beforeAnalysis.findings.length} findings | After: ${afterAnalysis.findings.length} findings`);
+        lines.push('');
+
+        if (fixed.length > 0) {
+          lines.push(`### Fixed (${fixed.length})`);
+          for (const f of fixed) lines.push(`- [${f.check}] ${f.message}`);
+          lines.push('');
+        }
+        if (introduced.length > 0) {
+          lines.push(`### Introduced (${introduced.length})`);
+          for (const f of introduced) lines.push(`- [${f.check}]${f.line ? ` (line ${f.line})` : ''}: ${f.message}`);
+          lines.push('');
+        }
+        if (unchanged.length > 0) {
+          lines.push(`### Unchanged (${unchanged.length})`);
+          for (const f of unchanged) lines.push(`- [${f.check}] ${f.message}`);
+        }
+        if (fixed.length === 0 && introduced.length === 0) {
+          lines.push('No changes in findings between the two versions.');
+        }
+
+        return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+      } catch (err) {
+        return {
+          content: [{ type: 'text' as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
   // ── Resource: config ────────────────────────────────────────────────
   server.registerResource(
     'analysis-config',
