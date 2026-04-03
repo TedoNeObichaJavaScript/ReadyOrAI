@@ -1,0 +1,56 @@
+{
+  "name": "readyorai",
+  "version": "0.1.0",
+  "description": "Zero-cost MCP server for local code inspection — clean code analysis, best practices, and recommendations without modifying your code",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "ready": "./build/cli.js",
+    "AI": "./build/cli.js",
+    "readyorai-server": "./build/index.js"
+  },
+  "files": [
+    "build",
+    "server.json"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src/",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "code-review",
+    "static-analysis",
+    "code-quality",
+    "best-practices",
+    "linter",
+    "claude"
+  ],
+  "author": "TedoNeObichaJavaScript",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TedoNeObichaJavaScript/ReadyOrAI.git"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "chalk": "^5.3.0",
+    "commander": "^12.1.0",
+    "glob": "^11.0.0",
+    "web-tree-sitter": "^0.24.7",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0",
+    "vitest": "^3.0.0"
+  }
+}
