@@ -1,0 +1,24 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.tedoneobichajavascript/readyorai",
+  "description": "Zero-cost MCP server for local code inspection — clean code analysis, best practices, and recommendations without modifying your code",
+  "repository": {
+    "url": "https://github.com/TedoNeObichaJavaScript/ReadyOrAI",
+    "source": "github"
+  },
+  "version_detail": {
+    "version": "0.1.0",
+    "release_date": "2026-04-03"
+  },
+  "packages": [
+    {
+      "registry_name": "npm",
+      "name": "readyorai",
+      "version": "0.1.0",
+      "runtime": "node",
+      "transport": ["stdio"],
+      "environment_variables": []
+    }
+  ],
+  "remotes": []
+}
