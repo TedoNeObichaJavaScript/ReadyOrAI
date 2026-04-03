@@ -8,7 +8,18 @@ export function analyzePatterns(lines: string[]): Finding[] {
     const trimmed = line.trim();
     const lineNum = i + 1;
 
-    // Skip comments
+    // TODO/FIXME/HACK comments (check before skipping comments)
+    const todoMatch = trimmed.match(/\b(TODO|FIXME|HACK|XXX|TEMP)\b[:\s]*(.*)/i);
+    if (todoMatch) {
+      findings.push({
+        check: 'patterns',
+        severity: 'info',
+        message: `${todoMatch[1].toUpperCase()}: ${todoMatch[2].trim() || '(no description)'}`,
+        line: lineNum,
+      });
+    }
+
+    // Skip comments for remaining checks
     if (trimmed.startsWith('//') || trimmed.startsWith('#') || trimmed.startsWith('*')) continue;
 
     // Console/print statements left in code
@@ -86,17 +97,6 @@ export function analyzePatterns(lines: string[]): Finding[] {
         message: 'Nested ternary operator reduces readability',
         line: lineNum,
         suggestion: 'Use if/else statements or extract into a function',
-      });
-    }
-
-    // TODO/FIXME/HACK comments
-    const todoMatch = trimmed.match(/\b(TODO|FIXME|HACK|XXX|TEMP)\b[:\s]*(.*)/i);
-    if (todoMatch) {
-      findings.push({
-        check: 'patterns',
-        severity: 'info',
-        message: `${todoMatch[1].toUpperCase()}: ${todoMatch[2].trim() || '(no description)'}`,
-        line: lineNum,
       });
     }
 
