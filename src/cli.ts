@@ -4,6 +4,7 @@ import * as fs from 'node:fs/promises';
 import { watch } from 'node:fs';
 import { analyzeFile, analyzeDirectory } from './analyzers/index.js';
 import { formatFileText, formatDirectoryText } from './formatters/text.js';
+import { formatFileSarif, formatDirectorySarif } from './formatters/sarif.js';
 import { loadConfig, mergeConfig } from './utils/config.js';
 import type { CheckName, AnalyzerOptions } from './types.js';
 
@@ -22,6 +23,7 @@ const HELP = `
     --checks <list>            Comma-separated checks (complexity,naming,structure,patterns,imports,documentation,security,duplication)
     --severity <level>         Minimum severity: info, warning, error
     --json                     Output as JSON
+    --sarif                    Output as SARIF (for GitHub Code Scanning)
     --watch, -w                Re-analyze on file changes
     --version, -v              Show version
     --help, -h                 Show this help
@@ -33,11 +35,13 @@ const HELP = `
     3   Runtime error
 `;
 
+type OutputFormat = 'text' | 'json' | 'sarif';
+
 async function runAnalysis(
   resolved: string,
   isDir: boolean,
   options: Partial<AnalyzerOptions>,
-  jsonOutput: boolean,
+  format: OutputFormat,
 ): Promise<{ errors: number; warnings: number }> {
   let errorCount = 0;
   let warningCount = 0;
@@ -47,21 +51,17 @@ async function runAnalysis(
     errorCount = analysis.findingsBySeverity.error;
     warningCount = analysis.findingsBySeverity.warning;
 
-    if (jsonOutput) {
-      console.log(JSON.stringify(analysis, null, 2));
-    } else {
-      console.log(formatDirectoryText(analysis));
-    }
+    if (format === 'json') console.log(JSON.stringify(analysis, null, 2));
+    else if (format === 'sarif') console.log(formatDirectorySarif(analysis));
+    else console.log(formatDirectoryText(analysis));
   } else {
     const analysis = await analyzeFile(resolved, options);
     errorCount = analysis.findings.filter(f => f.severity === 'error').length;
     warningCount = analysis.findings.filter(f => f.severity === 'warning').length;
 
-    if (jsonOutput) {
-      console.log(JSON.stringify(analysis, null, 2));
-    } else {
-      console.log(formatFileText(analysis));
-    }
+    if (format === 'json') console.log(JSON.stringify(analysis, null, 2));
+    else if (format === 'sarif') console.log(formatFileSarif(analysis));
+    else console.log(formatFileText(analysis));
   }
 
   return { errors: errorCount, warnings: warningCount };
@@ -81,7 +81,7 @@ async function main() {
   }
 
   // Parse flags
-  const jsonOutput = args.includes('--json');
+  const format: OutputFormat = args.includes('--sarif') ? 'sarif' : args.includes('--json') ? 'json' : 'text';
   const watchMode = args.includes('--watch') || args.includes('-w');
   const checksIndex = args.indexOf('--checks');
   const severityIndex = args.indexOf('--severity');
@@ -136,7 +136,7 @@ async function main() {
 
     if (watchMode) {
       console.log(`\x1b[36mWatching ${resolved} for changes...\x1b[0m\n`);
-      await runAnalysis(resolved, isDir, options, jsonOutput);
+      await runAnalysis(resolved, isDir, options, format);
 
       let debounce: ReturnType<typeof setTimeout> | null = null;
       watch(resolved, { recursive: isDir }, () => {
@@ -145,14 +145,14 @@ async function main() {
           console.clear();
           console.log(`\x1b[36mRe-analyzing (${new Date().toLocaleTimeString()})...\x1b[0m\n`);
           try {
-            await runAnalysis(resolved, isDir, options, jsonOutput);
+            await runAnalysis(resolved, isDir, options, format);
           } catch (err) {
             console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
           }
         }, 300);
       });
     } else {
-      const { errors, warnings } = await runAnalysis(resolved, isDir, options, jsonOutput);
+      const { errors, warnings } = await runAnalysis(resolved, isDir, options, format);
       if (errors > 0) process.exit(2);
       if (warnings > 0) process.exit(1);
     }
