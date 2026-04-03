@@ -100,8 +100,19 @@ export async function analyzeDirectory(
     try {
       const analysis = await analyzeFile(file, options);
       results.push(analysis);
-    } catch {
-      // Skip files that can't be analyzed (binary, too large, etc.)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      results.push({
+        filePath: file,
+        language: 'unknown',
+        metrics: { totalLines: 0, codeLines: 0, commentLines: 0, blankLines: 0, functionCount: 0, maxNestingDepth: 0, maxCyclomaticComplexity: 0, averageFunctionLength: 0 },
+        findings: [{
+          check: 'structure',
+          severity: 'warning',
+          message: `Failed to analyze file: ${msg}`,
+        }],
+        analyzedAt: new Date().toISOString(),
+      });
     }
   }
 
