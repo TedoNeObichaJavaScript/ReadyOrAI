@@ -4,11 +4,16 @@ Zero-cost MCP server for local code inspection. Analyzes your code for clean cod
 
 ## Features
 
-- **8 analyzers**: complexity, naming, structure, patterns, imports, documentation, security, duplication
+- **9 analyzers**: complexity, naming, structure, patterns, imports, documentation, security, duplication, AI-generated code detection
 - **Multi-language**: JS/TS, Python, Go, Rust (deep analysis) + Java, C#, Ruby, PHP, and more (regex-based)
 - **Zero-cost**: All analysis runs locally — no API keys, no external calls
 - **MCP server**: Works with Claude Desktop, Claude Code, and VS Code via stdio transport
 - **CLI tool**: `ready @filename` and `AI` terminal commands for standalone use
+- **SARIF output**: Export results for GitHub Code Scanning integration
+- **Watch mode**: Continuous re-analysis on file changes
+- **Baseline/diff mode**: Track incremental adoption — only see new issues
+- **Config file**: Project-level `.readyorai.json` for shared settings
+- **Inline suppressions**: Silence specific findings with `// readyorai-ignore` comments
 
 ## Installation
 
@@ -59,9 +64,42 @@ ready @src/index.ts                          # Inspect a single file
 ready @src/                                  # Inspect a directory
 ready @src/index.ts --checks security,naming # Run specific checks
 ready @src/index.ts --json                   # JSON output
+ready @src/index.ts --sarif                  # SARIF output (GitHub Code Scanning)
 ready @src/index.ts --severity warning       # Only warnings and errors
+ready @src/index.ts --watch                  # Re-analyze on file changes
+ready @src/ --baseline baseline.json         # Compare against saved baseline
+ready @src/ --save-baseline baseline.json    # Save current results as baseline
 AI                                           # Inspect current directory
 AI @src/utils.ts                             # Alias with file target
+```
+
+### Exit Codes
+
+| Code | Meaning |
+|------|---------|
+| `0` | No issues found |
+| `1` | Warnings found |
+| `2` | Errors found |
+| `3` | Runtime error |
+
+## Configuration
+
+Create a `.readyorai.json` in your project root:
+
+```json
+{
+  "checks": ["complexity", "naming", "security"],
+  "severity": "warning",
+  "exclude": ["dist/**", "node_modules/**"]
+}
+```
+
+### Inline Suppressions
+
+Silence specific findings on a line:
+
+```js
+eval(code); // readyorai-ignore
 ```
 
 ## MCP Tools
@@ -71,6 +109,8 @@ AI @src/utils.ts                             # Alias with file target
 | `inspect_file` | Analyze a single file for code quality issues |
 | `inspect_directory` | Batch analysis of all source files in a directory |
 | `get_metrics` | Get quantitative metrics (LOC, complexity, function count) |
+| `compare_files` | Compare two file versions and show fixed, introduced, or unchanged findings |
+| `suggest_fixes` | Get actionable fix suggestions with context for each finding |
 
 ## MCP Prompts
 
@@ -91,6 +131,7 @@ AI @src/utils.ts                             # Alias with file target
 | `documentation` | Missing JSDoc/docstrings, low comment ratio |
 | `security` | Hardcoded secrets, eval(), SQL injection, XSS patterns |
 | `duplication` | Duplicate code blocks, repeated magic strings |
+| `ai-detection` | Detects patterns common in AI-generated code |
 
 ## Language Support
 
