@@ -1,7 +1,7 @@
 import type { Finding } from '../types.js';
 
-const MIN_DUPLICATE_LINES = 6;
-const MIN_TOKEN_LENGTH = 30;
+const MIN_DUPLICATE_LINES = 8;
+const MIN_TOKEN_LENGTH = 80;
 
 export function analyzeDuplication(lines: string[]): Finding[] {
   const findings: Finding[] = [];

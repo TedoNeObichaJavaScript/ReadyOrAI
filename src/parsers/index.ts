@@ -30,11 +30,18 @@ function extractJSTSFunctions(lines: string[]): FunctionInfo[] {
   const patterns = [
     // function declaration
     /(?:export\s+)?(?:async\s+)?function\s+(\w+)\s*\(([^)]*)\)/,
-    // arrow function assigned to const/let/var
-    /(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\(?([^)]*)\)?\s*=>/,
-    // method in class/object
-    /^\s+(?:async\s+)?(\w+)\s*\(([^)]*)\)\s*(?::\s*\w+)?\s*\{/,
+    // arrow function assigned to const/let/var (must be at statement level)
+    /^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s+)?\(([^)]*)\)\s*(?::\s*\w+)?\s*=>/,
+    // method in class/object (must start with indentation + identifier)
+    /^\s+(?:async\s+)?([a-zA-Z_]\w*)\s*\(([^)]*)\)\s*(?::\s*\w+)?\s*\{/,
   ];
+
+  const SKIP_NAMES = new Set([
+    'if', 'for', 'while', 'switch', 'catch', 'else', 'return',
+    'map', 'filter', 'reduce', 'forEach', 'find', 'some', 'every',
+    'then', 'catch', 'finally', 'setTimeout', 'setInterval',
+    'require', 'import', 'console', 'log', 'warn', 'error',
+  ]);
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
@@ -42,6 +49,7 @@ function extractJSTSFunctions(lines: string[]): FunctionInfo[] {
       const match = line.match(pattern);
       if (match) {
         const name = match[1];
+        if (SKIP_NAMES.has(name)) continue;
         const params = match[2]?.trim();
         const paramCount = params ? params.split(',').filter(p => p.trim()).length : 0;
         const endLine = findClosingBrace(lines, i);
