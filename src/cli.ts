@@ -23,6 +23,12 @@ const HELP = `
     --json                     Output as JSON
     --version, -v              Show version
     --help, -h                 Show this help
+
+  Exit codes:
+    0   No issues found
+    1   Warnings found
+    2   Errors found
+    3   Runtime error
 `;
 
 async function main() {
@@ -92,8 +98,13 @@ async function main() {
       ignore: merged.ignore,
     };
 
+    let errorCount = 0;
+    let warningCount = 0;
+
     if (stat.isDirectory()) {
       const analysis = await analyzeDirectory(resolved, undefined, 50, options);
+      errorCount = analysis.findingsBySeverity.error;
+      warningCount = analysis.findingsBySeverity.warning;
 
       if (jsonOutput) {
         console.log(JSON.stringify(analysis, null, 2));
@@ -102,6 +113,8 @@ async function main() {
       }
     } else {
       const analysis = await analyzeFile(resolved, options);
+      errorCount = analysis.findings.filter(f => f.severity === 'error').length;
+      warningCount = analysis.findings.filter(f => f.severity === 'warning').length;
 
       if (jsonOutput) {
         console.log(JSON.stringify(analysis, null, 2));
@@ -109,9 +122,13 @@ async function main() {
         console.log(formatFileText(analysis));
       }
     }
+
+    // Exit code: 2 for errors, 1 for warnings-only, 0 for clean
+    if (errorCount > 0) process.exit(2);
+    if (warningCount > 0) process.exit(1);
   } catch (err) {
     console.error(`Error: ${err instanceof Error ? err.message : String(err)}`);
-    process.exit(1);
+    process.exit(3);
   }
 }
 
