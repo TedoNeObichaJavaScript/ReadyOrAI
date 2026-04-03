@@ -110,6 +110,12 @@ npm run build
 npm test
 ```
 
+## Support
+
+If you find ReadyOrAI useful, consider supporting the project:
+
+- **Borko** — 5 euro
+
 ## License
 
 MIT
