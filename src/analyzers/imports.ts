@@ -91,7 +91,7 @@ export function analyzeImports(lines: string[], language: SupportedLanguage): Fi
       const line = lines[i];
       // Skip other import lines
       if (/^\s*(import|from)\b/.test(line)) continue;
-      if (line.includes(symbol)) {
+      if (new RegExp(`\\b${symbol.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(line)) {
         usageCount++;
         break;
       }
