@@ -213,6 +213,71 @@ export function createServer(): McpServer {
     },
   );
 
+  // ── Tool: suggest_fixes ──────────────────────────────────────────────
+  server.registerTool(
+    'suggest_fixes',
+    {
+      title: 'Suggest Fixes',
+      description: 'Analyze a file and return actionable fix suggestions for each finding, including what to change and where.',
+      inputSchema: {
+        path: z.string().describe('Path to the file to analyze'),
+        severity_threshold: z.enum(['info', 'warning', 'error']).optional().describe('Minimum severity to suggest fixes for. Defaults to warning.'),
+      },
+      annotations: {
+        readOnlyHint: true,
+        destructiveHint: false,
+        openWorldHint: false,
+      },
+    },
+    async ({ path, severity_threshold }) => {
+      try {
+        const analysis = await analyzeFile(path, {
+          checks: ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication'],
+          severityThreshold: severity_threshold ?? 'warning',
+        });
+
+        if (analysis.findings.length === 0) {
+          return { content: [{ type: 'text' as const, text: `## ${path}\n\nNo issues found at this severity level.` }] };
+        }
+
+        const file = await readSourceFile(path);
+        const lines: string[] = [];
+        lines.push(`## Suggested Fixes: ${path}`);
+        lines.push(`${analysis.findings.length} findings\n`);
+
+        for (const f of analysis.findings) {
+          lines.push(`### ${f.severity.toUpperCase()}: ${f.message}`);
+          if (f.line) {
+            const ctx = file.lines[f.line - 1];
+            if (ctx !== undefined) {
+              lines.push(`\`\`\`\nLine ${f.line}: ${ctx.trimEnd()}\n\`\`\``);
+            }
+          }
+          if (f.suggestion) {
+            lines.push(`**Fix:** ${f.suggestion}`);
+          }
+          if (f.check === 'structure' && f.message.includes('lines')) {
+            lines.push('**Action:** Extract helper functions or split into separate modules.');
+          } else if (f.check === 'complexity') {
+            lines.push('**Action:** Use early returns, extract conditions into named booleans, or split into smaller functions.');
+          } else if (f.check === 'security') {
+            lines.push('**Action:** Sanitize inputs, use parameterized queries, or apply allowlists.');
+          } else if (f.check === 'imports' && f.message.includes('unused')) {
+            lines.push('**Action:** Remove the unused import statement.');
+          }
+          lines.push('');
+        }
+
+        return { content: [{ type: 'text' as const, text: lines.join('\n') }] };
+      } catch (err) {
+        return {
+          content: [{ type: 'text' as const, text: `Error: ${err instanceof Error ? err.message : String(err)}` }],
+          isError: true,
+        };
+      }
+    },
+  );
+
   // ── Resource: config ────────────────────────────────────────────────
   server.registerResource(
     'analysis-config',
