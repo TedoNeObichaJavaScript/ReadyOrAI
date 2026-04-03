@@ -32,12 +32,6 @@ export function analyzePatterns(lines: string[]): Finding[] {
         suggestion: 'Remove or replace with a proper logging library',
       });
     }
-    if (/\bprint\s*\(/.test(line) && !/\bprint\s*\(.*,\s*file\s*=/.test(line)) {
-      // Python print (but not print to file)
-      if (/\.py$/.test('') === false) { // Will be checked via language context
-        // Skip — this is a loose heuristic, only flag if clearly debug
-      }
-    }
 
     // Empty catch blocks
     if (/\bcatch\s*\([^)]*\)\s*\{\s*\}/.test(line)) {
