@@ -11,13 +11,14 @@ import { analyzeDocumentation } from './documentation.js';
 import { analyzeSecurity } from './security.js';
 import { analyzeImports } from './imports.js';
 import { analyzeDuplication } from './duplication.js';
+import { analyzeAIGenerated } from './ai-detection.js';
 import { extractFunctionsRegex } from '../parsers/index.js';
 import { loadConfig, mergeConfig } from '../utils/config.js';
 import type { DirectoryAnalysis } from '../types.js';
 
 const ALL_CHECKS: CheckName[] = [
   'structure', 'naming', 'complexity', 'patterns',
-  'documentation', 'security', 'imports', 'duplication',
+  'documentation', 'security', 'imports', 'duplication', 'ai-detection',
 ];
 
 export async function analyzeFile(
@@ -72,6 +73,9 @@ export async function analyzeFile(
   }
   if (checks.includes('duplication')) {
     findings.push(...analyzeDuplication(file.lines));
+  }
+  if (checks.includes('ai-detection')) {
+    findings.push(...analyzeAIGenerated(file.lines, functions));
   }
 
   // Filter by severity threshold

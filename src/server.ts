@@ -8,7 +8,7 @@ import { extractFunctionsRegex } from './parsers/index.js';
 import { formatFileAnalysis, formatDirectoryAnalysis, formatMetricsOnly } from './formatters/mcp.js';
 import type { CheckName } from './types.js';
 
-const CHECK_VALUES = ['all', 'complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication'] as const;
+const CHECK_VALUES = ['all', 'complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication', 'ai-detection'] as const;
 
 export function createServer(): McpServer {
   const server = new McpServer(
@@ -49,7 +49,7 @@ export function createServer(): McpServer {
           : (checks.filter(c => c !== 'all') as CheckName[]);
 
         const analysis = await analyzeFile(path, {
-          checks: resolvedChecks ?? ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication'],
+          checks: resolvedChecks ?? ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication', 'ai-detection'],
           severityThreshold: severity_threshold ?? 'info',
         });
 
@@ -232,7 +232,7 @@ export function createServer(): McpServer {
     async ({ path, severity_threshold }) => {
       try {
         const analysis = await analyzeFile(path, {
-          checks: ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication'],
+          checks: ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication', 'ai-detection'],
           severityThreshold: severity_threshold ?? 'warning',
         });
 
@@ -291,7 +291,7 @@ export function createServer(): McpServer {
       contents: [{
         uri: uri.href,
         text: JSON.stringify({
-          checks: ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication'],
+          checks: ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication', 'ai-detection'],
           severityLevels: ['info', 'warning', 'error'],
           supportedLanguages: {
             tier1: ['javascript', 'typescript', 'python', 'go', 'rust'],

@@ -8,7 +8,8 @@ export type CheckName =
   | 'imports'
   | 'documentation'
   | 'security'
-  | 'duplication';
+  | 'duplication'
+  | 'ai-detection';
 
 export interface Finding {
   check: CheckName;

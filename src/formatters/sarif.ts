@@ -72,6 +72,7 @@ const RULES = [
   { id: 'readyorai/security', shortDescription: { text: 'Security vulnerability patterns' } },
   { id: 'readyorai/imports', shortDescription: { text: 'Import organization and usage' } },
   { id: 'readyorai/duplication', shortDescription: { text: 'Code duplication detection' } },
+  { id: 'readyorai/ai-detection', shortDescription: { text: 'AI-generated code detection' } },
 ];
 
 function createSarifLog(results: SarifResult[]): SarifLog {

@@ -152,7 +152,7 @@ async function main() {
       severityThreshold: severity,
     });
     const options: Partial<AnalyzerOptions> = {
-      checks: merged.checks as CheckName[] ?? ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication'] as CheckName[],
+      checks: merged.checks as CheckName[] ?? ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication', 'ai-detection'] as CheckName[],
       severityThreshold: merged.severityThreshold ?? severity,
       thresholds: merged.thresholds,
       rules: merged.rules,
