@@ -6,7 +6,7 @@ import { analyzeFile, analyzeDirectory } from './analyzers/index.js';
 import { formatFileText, formatDirectoryText } from './formatters/text.js';
 import { formatFileSarif, formatDirectorySarif } from './formatters/sarif.js';
 import { loadConfig, mergeConfig } from './utils/config.js';
-import type { CheckName, AnalyzerOptions } from './types.js';
+import type { CheckName, AnalyzerOptions, Finding } from './types.js';
 
 const VERSION = '0.1.0';
 
@@ -24,6 +24,8 @@ const HELP = `
     --severity <level>         Minimum severity: info, warning, error
     --json                     Output as JSON
     --sarif                    Output as SARIF (for GitHub Code Scanning)
+    --baseline <file>          Compare against a saved baseline (JSON)
+    --save-baseline <file>     Save current results as baseline
     --watch, -w                Re-analyze on file changes
     --version, -v              Show version
     --help, -h                 Show this help
@@ -42,26 +44,44 @@ async function runAnalysis(
   isDir: boolean,
   options: Partial<AnalyzerOptions>,
   format: OutputFormat,
+  baselineKeys?: Set<string>,
 ): Promise<{ errors: number; warnings: number }> {
   let errorCount = 0;
   let warningCount = 0;
 
+  const filterBaseline = (findings: Finding[]) =>
+    baselineKeys ? findings.filter(f => !baselineKeys.has(`${f.check}:${f.message}`)) : findings;
+
   if (isDir) {
-    const analysis = await analyzeDirectory(resolved, undefined, 50, options);
-    errorCount = analysis.findingsBySeverity.error;
-    warningCount = analysis.findingsBySeverity.warning;
+    const dirAnalysis = await analyzeDirectory(resolved, undefined, 50, options);
+    if (baselineKeys) {
+      for (const file of dirAnalysis.files) {
+        file.findings = filterBaseline(file.findings);
+      }
+      const filtered = dirAnalysis.files.flatMap(f => f.findings);
+      dirAnalysis.totalFindings = filtered.length;
+      dirAnalysis.findingsBySeverity = { info: 0, warning: 0, error: 0 };
+      dirAnalysis.findingsByCheck = {};
+      for (const f of filtered) {
+        dirAnalysis.findingsBySeverity[f.severity]++;
+        dirAnalysis.findingsByCheck[f.check] = (dirAnalysis.findingsByCheck[f.check] || 0) + 1;
+      }
+    }
+    errorCount = dirAnalysis.findingsBySeverity.error;
+    warningCount = dirAnalysis.findingsBySeverity.warning;
 
-    if (format === 'json') console.log(JSON.stringify(analysis, null, 2));
-    else if (format === 'sarif') console.log(formatDirectorySarif(analysis));
-    else console.log(formatDirectoryText(analysis));
+    if (format === 'json') console.log(JSON.stringify(dirAnalysis, null, 2));
+    else if (format === 'sarif') console.log(formatDirectorySarif(dirAnalysis));
+    else console.log(formatDirectoryText(dirAnalysis));
   } else {
-    const analysis = await analyzeFile(resolved, options);
-    errorCount = analysis.findings.filter(f => f.severity === 'error').length;
-    warningCount = analysis.findings.filter(f => f.severity === 'warning').length;
+    const fileAnalysis = await analyzeFile(resolved, options);
+    fileAnalysis.findings = filterBaseline(fileAnalysis.findings);
+    errorCount = fileAnalysis.findings.filter(f => f.severity === 'error').length;
+    warningCount = fileAnalysis.findings.filter(f => f.severity === 'warning').length;
 
-    if (format === 'json') console.log(JSON.stringify(analysis, null, 2));
-    else if (format === 'sarif') console.log(formatFileSarif(analysis));
-    else console.log(formatFileText(analysis));
+    if (format === 'json') console.log(JSON.stringify(fileAnalysis, null, 2));
+    else if (format === 'sarif') console.log(formatFileSarif(fileAnalysis));
+    else console.log(formatFileText(fileAnalysis));
   }
 
   return { errors: errorCount, warnings: warningCount };
@@ -95,6 +115,11 @@ async function main() {
   if (severityIndex >= 0 && args[severityIndex + 1]) {
     severity = args[severityIndex + 1] as 'info' | 'warning' | 'error';
   }
+
+  const baselineIndex = args.indexOf('--baseline');
+  const baselinePath = baselineIndex >= 0 ? args[baselineIndex + 1] : undefined;
+  const saveBaselineIndex = args.indexOf('--save-baseline');
+  const saveBaselinePath = saveBaselineIndex >= 0 ? args[saveBaselineIndex + 1] : undefined;
 
   // Find target (strip @ prefix)
   let target: string | null = null;
@@ -152,6 +177,39 @@ async function main() {
         }, 300);
       });
     } else {
+      // Save baseline mode
+      if (saveBaselinePath) {
+        const analysis = isDir
+          ? await analyzeDirectory(resolved, undefined, 50, options)
+          : await analyzeFile(resolved, options);
+        await fs.writeFile(path.resolve(saveBaselinePath), JSON.stringify(analysis, null, 2));
+        console.log(`Baseline saved to ${saveBaselinePath}`);
+        return;
+      }
+
+      // Baseline diff mode
+      if (baselinePath) {
+        const baselineRaw = await fs.readFile(path.resolve(baselinePath), 'utf-8');
+        const baseline = JSON.parse(baselineRaw);
+        const baselineKeys = new Set<string>();
+
+        const extractKeys = (findings: Array<{check: string; message: string}>) =>
+          findings.map(f => `${f.check}:${f.message}`);
+
+        if (baseline.files) {
+          for (const file of baseline.files) {
+            for (const key of extractKeys(file.findings)) baselineKeys.add(key);
+          }
+        } else if (baseline.findings) {
+          for (const key of extractKeys(baseline.findings)) baselineKeys.add(key);
+        }
+
+        const { errors, warnings } = await runAnalysis(resolved, isDir, options, format, baselineKeys);
+        if (errors > 0) process.exit(2);
+        if (warnings > 0) process.exit(1);
+        return;
+      }
+
       const { errors, warnings } = await runAnalysis(resolved, isDir, options, format);
       if (errors > 0) process.exit(2);
       if (warnings > 0) process.exit(1);
