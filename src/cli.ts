@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import { analyzeFile, analyzeDirectory } from './analyzers/index.js';
 import { formatFileText, formatDirectoryText } from './formatters/text.js';
+import { loadConfig, mergeConfig } from './utils/config.js';
 import type { CheckName } from './types.js';
 
 const VERSION = '0.1.0';
@@ -77,9 +78,22 @@ async function main() {
 
   try {
     const stat = await fs.stat(resolved);
+    const configDir = stat.isDirectory() ? resolved : path.dirname(resolved);
+    const fileConfig = await loadConfig(configDir);
+    const merged = mergeConfig(fileConfig, {
+      checks: checks ?? undefined,
+      severityThreshold: severity,
+    });
+    const options = {
+      checks: merged.checks as CheckName[] ?? ['complexity', 'naming', 'structure', 'patterns', 'imports', 'documentation', 'security', 'duplication'] as CheckName[],
+      severityThreshold: merged.severityThreshold ?? severity,
+      thresholds: merged.thresholds,
+      rules: merged.rules,
+      ignore: merged.ignore,
+    };
 
     if (stat.isDirectory()) {
-      const analysis = await analyzeDirectory(resolved, undefined, 50, checks ? { checks, severityThreshold: severity } : undefined);
+      const analysis = await analyzeDirectory(resolved, undefined, 50, options);
 
       if (jsonOutput) {
         console.log(JSON.stringify(analysis, null, 2));
@@ -87,7 +101,7 @@ async function main() {
         console.log(formatDirectoryText(analysis));
       }
     } else {
-      const analysis = await analyzeFile(resolved, checks ? { checks, severityThreshold: severity } : undefined);
+      const analysis = await analyzeFile(resolved, options);
 
       if (jsonOutput) {
         console.log(JSON.stringify(analysis, null, 2));

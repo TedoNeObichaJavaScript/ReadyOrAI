@@ -62,6 +62,9 @@ export interface FunctionInfo {
 export interface AnalyzerOptions {
   checks: CheckName[];
   severityThreshold: Severity;
+  thresholds?: Partial<typeof DEFAULT_THRESHOLDS>;
+  rules?: Partial<Record<CheckName, { enabled?: boolean }>>;
+  ignore?: string[];
 }
 
 export const SEVERITY_ORDER: Record<Severity, number> = {
@@ -69,6 +72,14 @@ export const SEVERITY_ORDER: Record<Severity, number> = {
   warning: 1,
   error: 2,
 };
+
+export interface ReadyOrAIConfig {
+  checks?: CheckName[];
+  severityThreshold?: Severity;
+  ignore?: string[];
+  thresholds?: Partial<typeof DEFAULT_THRESHOLDS>;
+  rules?: Partial<Record<CheckName, { enabled?: boolean }>>;
+}
 
 export const DEFAULT_THRESHOLDS = {
   maxFileLines: 300,

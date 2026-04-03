@@ -1,9 +1,9 @@
 import type { Finding, FunctionInfo } from '../types.js';
 import { DEFAULT_THRESHOLDS } from '../types.js';
 
-export function analyzeStructure(lines: string[], functions: FunctionInfo[], filePath: string): Finding[] {
+export function analyzeStructure(lines: string[], functions: FunctionInfo[], filePath: string, thresholdOverrides?: Partial<typeof DEFAULT_THRESHOLDS>): Finding[] {
   const findings: Finding[] = [];
-  const t = DEFAULT_THRESHOLDS;
+  const t = { ...DEFAULT_THRESHOLDS, ...thresholdOverrides };
 
   // File length
   if (lines.length > t.maxFileLinesError) {

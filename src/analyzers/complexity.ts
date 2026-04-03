@@ -1,9 +1,9 @@
 import type { Finding, FunctionInfo } from '../types.js';
 import { DEFAULT_THRESHOLDS } from '../types.js';
 
-export function analyzeComplexity(functions: FunctionInfo[]): Finding[] {
+export function analyzeComplexity(functions: FunctionInfo[], thresholdOverrides?: Partial<typeof DEFAULT_THRESHOLDS>): Finding[] {
   const findings: Finding[] = [];
-  const t = DEFAULT_THRESHOLDS;
+  const t = { ...DEFAULT_THRESHOLDS, ...thresholdOverrides };
 
   for (const fn of functions) {
     // Cyclomatic complexity

@@ -6,6 +6,7 @@ export function analyzeDocumentation(
   lines: string[],
   functions: FunctionInfo[],
   language: SupportedLanguage,
+  thresholdOverrides?: Partial<typeof DEFAULT_THRESHOLDS>,
 ): Finding[] {
   const findings: Finding[] = [];
 
@@ -31,7 +32,8 @@ export function analyzeDocumentation(
   const { commentLines, codeLines } = countCommentAndCode(lines);
   if (codeLines > 50) {
     const ratio = commentLines / codeLines;
-    if (ratio < DEFAULT_THRESHOLDS.minCommentRatio) {
+    const t = { ...DEFAULT_THRESHOLDS, ...thresholdOverrides };
+    if (ratio < t.minCommentRatio) {
       findings.push({
         check: 'documentation',
         severity: 'info',

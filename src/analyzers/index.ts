@@ -1,5 +1,5 @@
-import type { CheckName, FileAnalysis, Finding, FunctionInfo, AnalyzerOptions, Severity } from '../types.js';
-import { SEVERITY_ORDER } from '../types.js';
+import type { CheckName, FileAnalysis, Finding, FunctionInfo, AnalyzerOptions, Severity, ReadyOrAIConfig } from '../types.js';
+import { SEVERITY_ORDER, DEFAULT_THRESHOLDS } from '../types.js';
 import { readSourceFile, listSourceFiles } from '../utils/file-reader.js';
 import { detectLanguage, getLanguageTier } from '../utils/language-detect.js';
 import { computeFileMetrics } from '../utils/metrics.js';
@@ -12,6 +12,7 @@ import { analyzeSecurity } from './security.js';
 import { analyzeImports } from './imports.js';
 import { analyzeDuplication } from './duplication.js';
 import { extractFunctionsRegex } from '../parsers/index.js';
+import { loadConfig, mergeConfig } from '../utils/config.js';
 import type { DirectoryAnalysis } from '../types.js';
 
 const ALL_CHECKS: CheckName[] = [
@@ -23,7 +24,12 @@ export async function analyzeFile(
   filePath: string,
   options?: Partial<AnalyzerOptions>,
 ): Promise<FileAnalysis> {
-  const checks = options?.checks ?? ALL_CHECKS;
+  const thresholds = options?.thresholds;
+  const rules = options?.rules;
+  const rawChecks = options?.checks ?? ALL_CHECKS;
+  const checks = rules
+    ? rawChecks.filter(c => rules[c]?.enabled !== false)
+    : rawChecks;
   const threshold = options?.severityThreshold ?? 'info';
 
   const file = await readSourceFile(filePath);
@@ -44,19 +50,19 @@ export async function analyzeFile(
 
   // Run selected analyzers
   if (checks.includes('structure')) {
-    findings.push(...analyzeStructure(file.lines, functions, filePath));
+    findings.push(...analyzeStructure(file.lines, functions, filePath, thresholds));
   }
   if (checks.includes('naming')) {
     findings.push(...analyzeNaming(file.lines, functions, language));
   }
   if (checks.includes('complexity')) {
-    findings.push(...analyzeComplexity(functions));
+    findings.push(...analyzeComplexity(functions, thresholds));
   }
   if (checks.includes('patterns')) {
     findings.push(...analyzePatterns(file.lines));
   }
   if (checks.includes('documentation')) {
-    findings.push(...analyzeDocumentation(file.lines, functions, language));
+    findings.push(...analyzeDocumentation(file.lines, functions, language, thresholds));
   }
   if (checks.includes('security')) {
     findings.push(...analyzeSecurity(file.lines));
@@ -93,12 +99,25 @@ export async function analyzeDirectory(
   maxFiles: number = 50,
   options?: Partial<AnalyzerOptions>,
 ): Promise<DirectoryAnalysis> {
+  // Load config from target directory and merge with explicit options
+  const fileConfig = await loadConfig(dirPath);
+  const merged = mergeConfig(fileConfig, options);
+  const effectiveOptions: Partial<AnalyzerOptions> = {
+    checks: merged.checks ?? options?.checks,
+    severityThreshold: merged.severityThreshold ?? options?.severityThreshold ?? 'info',
+    thresholds: merged.thresholds,
+    rules: merged.rules,
+    ignore: merged.ignore,
+  };
+
+  const ignorePatterns = effectiveOptions.ignore ?? [];
   const files = await listSourceFiles(dirPath, pattern, maxFiles);
   const results: FileAnalysis[] = [];
 
   for (const file of files) {
+    if (ignorePatterns.some(p => file.includes(p.replace(/\*\*/g, '').replace(/\*/g, '')))) continue;
     try {
-      const analysis = await analyzeFile(file, options);
+      const analysis = await analyzeFile(file, effectiveOptions);
       results.push(analysis);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
