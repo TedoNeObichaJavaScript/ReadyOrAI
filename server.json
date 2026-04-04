@@ -6,19 +6,15 @@
     "url": "https://github.com/TedoNeObichaJavaScript/ReadyOrAI",
     "source": "github"
   },
-  "version_detail": {
-    "version": "0.1.0",
-    "release_date": "2026-04-03"
-  },
+  "version": "0.1.0",
   "packages": [
     {
-      "registry_name": "npm",
-      "name": "readyorai",
+      "registryType": "npm",
+      "identifier": "readyorai",
       "version": "0.1.0",
-      "runtime": "node",
-      "transport": ["stdio"],
-      "environment_variables": []
+      "transport": {
+        "type": "stdio"
+      }
     }
-  ],
-  "remotes": []
+  ]
 }
