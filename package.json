@@ -1,6 +1,6 @@
 {
   "name": "readyorai",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "mcpName": "io.github.tedoneobichajavascript/readyorai",
   "description": "Zero-cost MCP server for local code inspection — clean code analysis, best practices, and recommendations without modifying your code",
   "type": "module",
