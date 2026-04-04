@@ -5,9 +5,9 @@
   "type": "module",
   "main": "build/index.js",
   "bin": {
-    "ready": "./build/cli.js",
-    "AI": "./build/cli.js",
-    "readyorai-server": "./build/index.js"
+    "readyorai": "build/cli.js",
+    "ready": "build/cli.js",
+    "readyorai-server": "build/index.js"
   },
   "files": [
     "build",
